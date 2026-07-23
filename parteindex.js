@@ -1,1 +1,39 @@
+  // Guarda os agendamentos gerais em memória
+  client.agendamentosGerais = new Map();
 
+    // ⏰ SISTEMA DE LEMBRETE (Rodando a cada 1 minuto)
+    setInterval(() => {
+      const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+
+      const diasMap = {
+        0: 'domingo',
+        1: 'segunda',
+        2: 'terca',
+        3: 'quarta',
+        4: 'quinta',
+        5: 'sexta',
+        6: 'sabado'
+      };
+
+      const diaAtual = diasMap[agora.getDay()];
+
+      const horaAlvo = new Date(agora.getTime() + 2 * 60 * 60 * 1000);
+      const h = String(horaAlvo.getHours()).padStart(2, '0');
+      const m = String(horaAlvo.getMinutes()).padStart(2, '0');
+      const horarioAlvoFormatado = `${h}:${m}`;
+
+      const chaveBusca = `${diaAtual}-${horarioAlvoFormatado}`;
+
+      if (client.agendamentosGerais.has(chaveBusca)) {
+        const dono = client.agendamentosGerais.get(chaveBusca);
+        const matchId = dono.match(/<@!?(\d+)>/);
+
+        if (matchId) {
+          const userId = matchId[1];
+          client.users.fetch(userId).then(user => {
+            user.send(`⚠️ **Lembrete de Postagem!**\nPassando para lembrar que tens um horário agendado hoje (**${diaAtual}**) às **${horarioAlvoFormatado}** (daqui a 2 horas).\n\nVais conseguir fazer a postagem certinho? ⏱️`).catch(err => console.log("Erro ao enviar DM:", err));
+          }).catch(err => console.log("Erro ao buscar user:", err));
+        }
+      }
+    }, 60_000); 
+  });
