@@ -1,0 +1,104 @@
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+
+module.exports = {
+  name: 'horarios',
+  run: async (client, message, args) => {
+    // 🕒 Se a grade global não existir no client, inicializa com a padrão
+    if (!client.gradeHorariosFixos) {
+      client.gradeHorariosFixos = {
+        segunda: ["14:00", "18:00"],
+        terca: ["16:00", "20:00"],
+        quarta: ["15:00", "19:00"],
+        quinta: ["14:00", "17:00"],
+        sexta: ["16:00", "21:00"]
+      };
+    }
+
+    // Cores e títulos para cada dia
+    const configDias = {
+      segunda: { titulo: "<:pnk5:1529737522098208818> Segunda-Feira", cor: "ff8aff" },
+      terca: { titulo: "<:pnk5:1529737522098208818> Terça-Feira", cor: "ff8aff" },
+      quarta: { titulo: "<:pnk5:1529737522098208818> Quarta-Feira", cor: "ff8aff" },
+      quinta: { titulo: "<:pnk5:1529737522098208818> Quinta-Feira", cor: "ff8aff" },
+      sexta: { titulo: "<:pnk5:1529737522098208818> Sexta-Feira", cor: "ff8aff" }
+    };
+
+    // Função para gerar o Embed puxando direto da memória atualizada
+    const criarEmbedDia = (diaKey) => {
+      const config = configDias[diaKey];
+      const listaHorarios = client.gradeHorariosFixos[diaKey] || [];
+
+      let descricao = "";
+      if (listaHorarios.length === 0) {
+        descricao = "*(Nenhum horário cadastrado para este dia)*";
+      } else {
+        // Ordena os horários antes de exibir
+        listaHorarios.sort();
+        for (const hora of listaHorarios) {
+          // Verifica se já tem alguém agendado nesse horário
+          const chaveBusca = `${diaKey}-${hora}`;
+          const quemMarcou = client.agendamentosGerais && client.agendamentosGerais.get(chaveBusca);
+
+          if (quemMarcou) {
+            descricao += `• **${hora}** — Reservado para ${quemMarcou} <:pnk4:1529737525206454292>\n`;
+          } else {
+            descricao += `• **${hora}** — Disponível <:pnk9:1529756441408307251>\n`;
+          }
+        }
+      }
+
+      return new EmbedBuilder()
+        .setTitle(config.titulo)
+        .setDescription(descricao)
+        .setColor(config.cor)
+        .setFooter({ text: 'Clique nos botões abaixo para alternar os dias da semana.' })
+        .setTimestamp();
+    };
+
+    // Criando os botões para cada dia da semana
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('segunda').setLabel('Segunda').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('terca').setLabel('Terça').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('quarta').setLabel('Quarta').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('quinta').setLabel('Quinta').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('sexta').setLabel('Sexta').setStyle(ButtonStyle.Primary)
+    );
+
+    // Envia a mensagem inicial abrindo direto na Segunda-Feira
+    const diaInicial = 'segunda';
+    const mensagemEnviada = await message.reply({
+      embeds: [criarEmbedDia(diaInicial)],
+      components: [row]
+    });
+
+    // Coletor de cliques nos botões (válido por 5 minutos)
+    const collector = mensagemEnviada.createMessageComponentCollector({ time: 300_000 });
+
+    collector.on('collect', async i => {
+      if (i.user.id !== message.author.id) {
+        return i.reply({ content: '<:pnk10:1529756439852224692> Você não pode usar estes botões!', ephemeral: true });
+      }
+
+      const diaClicado = i.customId; 
+
+      if (configDias[diaClicado]) {
+        await i.update({
+          embeds: [criarEmbedDia(diaClicado)],
+          components: [row]
+        });
+      }
+    });
+
+    collector.on('end', () => {
+      const rowDesativada = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('segunda').setLabel('Segunda').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('terca').setLabel('Terça').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('quarta').setLabel('Quarta').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('quinta').setLabel('Quinta').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('sexta').setLabel('Sexta').setStyle(ButtonStyle.Secondary).setDisabled(true)
+      );
+      mensagemEnviada.edit({ components: [rowDesativada] }).catch(() => {});
+    });
+  }
+};
+
